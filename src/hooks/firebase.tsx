@@ -3,7 +3,7 @@ import { initializeApp, FirebaseApp } from "firebase/app";
 import { getAuth, signInWithPopup, GoogleAuthProvider, Auth, getAdditionalUserInfo, signOut as authSignOut } from "firebase/auth";
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { getStorage, ref, uploadBytes, FirebaseStorage, getDownloadURL, deleteObject, getBlob, listAll, getMetadata } from "firebase/storage";
-import { getFirestore, doc, Firestore, collection, addDoc, updateDoc, deleteDoc, getDoc, setDoc, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, Firestore, collection, addDoc, updateDoc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { useQueries } from '@tanstack/react-query';
 import { Functions, getFunctions, httpsCallable } from "firebase/functions";
@@ -146,7 +146,7 @@ export const useFiles = () => {
                 type: data.type,
                 size: (data.sizeX && data.sizeY) ? [data.sizeX as number, data.sizeY as number] as const : null,
                 url: data.uploaded ? withUrl : null,
-            };
+            } as UploadedFile;
         }) ?? [];
     }, [value?.docs, filesWithUrls]);
 
@@ -238,7 +238,7 @@ export const useFiles = () => {
 export const useFunctions = () => {
     const { functions } = useFirebase();
     const demoCall = httpsCallable(functions, 'on_demo_call');
-    const quantumBlurCall = httpsCallable(functions, 'on_quantum_blur');
+    // const quantumBlurCall = httpsCallable(functions, 'on_quantum_blur');
     const quantumRotateCall = httpsCallable(functions, 'on_quantum_rotate');
 
     const tryExampleCall = async (fileId: string) => {

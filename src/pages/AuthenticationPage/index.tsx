@@ -1,10 +1,9 @@
 
-import { Button } from "@/components/button";
 import { UserAuthForm } from "./UserAuthForm";
 import { useAuth } from "@/hooks/firebase";
 
 export default function AuthenticationPage() {
-    const { user, loading, signInLoading, signInWithGoogle, signOut } = useAuth();
+    const { signInLoading, signInWithGoogle } = useAuth();
 
     return (
         <>

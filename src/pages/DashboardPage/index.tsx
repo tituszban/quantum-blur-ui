@@ -78,7 +78,8 @@ export default function DashboardPage() {
         setCreatedFileId(null);
         quantumRotate(selectedFileId, useLog, transformScale(sliderValue)).then(result => {
             console.log(result);
-            setCreatedFileId(result.data.new_doc);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setCreatedFileId((result.data as any).new_doc);
             setCurrentPanel(2);
         }).finally(() => setRequestPending(false));
     };
