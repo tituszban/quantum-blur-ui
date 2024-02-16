@@ -21,11 +21,11 @@ export default function AuthenticationPage() {
                     <div className="relative z-20 mt-auto">
                         <blockquote className="space-y-2">
                             <p className="text-lg">
-                                &ldquo;This library has saved me countless hours of work and
-                                helped me deliver stunning designs to my clients faster than
-                                ever before.&rdquo;
+                                &ldquo;Inside the Schrödinger's cat box, the quasi quantum
+                                particles are dancing on the net of quantum attention function,
+                                vanishing and arising.&rdquo;
                             </p>
-                            <footer className="text-sm">Sofia Davis</footer>
+                            <footer className="text-sm">Amit Ray</footer>
                         </blockquote>
                     </div>
                 </div>

@@ -1,22 +1,31 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import { initializeApp, FirebaseApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getAuth, signInWithPopup, GoogleAuthProvider, Auth, getAdditionalUserInfo, User, signOut as authSignOut } from "firebase/auth";
+import { getAuth, signInWithPopup, GoogleAuthProvider, Auth, getAdditionalUserInfo, signOut as authSignOut } from "firebase/auth";
 import { useAuthState } from 'react-firebase-hooks/auth';
+import { getStorage, ref, uploadBytes, FirebaseStorage, getDownloadURL, deleteObject } from "firebase/storage";
+import { getFirestore, doc, Firestore, collection, addDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
+import { useQueries } from '@tanstack/react-query';
+import { Functions, getFunctions, httpsCallable } from "firebase/functions";
 
 const firebaseConfig = {
     apiKey: "AIzaSyATHYacPTaCwSGH7Jnme0bCFOh9SuKoHUs",
     authDomain: "quantum-blur.firebaseapp.com",
     projectId: "quantum-blur",
     storageBucket: "quantum-blur.appspot.com",
-    messagingSenderId: "478601168516",
+    // messagingSenderId: "478601168516",
     appId: "1:478601168516:web:9e85ec719122d6cc98e4d1",
-    measurementId: "G-16TEVEB2TZ"
+    measurementId: "G-16TEVEB2TZ",
+    functionRegion: "europe-west1"
 };
 
 interface IFirebaseContext {
     app: FirebaseApp;
     auth: Auth;
+    storage: FirebaseStorage;
+    firestore: Firestore;
+    functions: Functions;
 }
 
 const FirebaseContext = createContext<IFirebaseContext | null>(null);
@@ -30,9 +39,15 @@ export const FirebaseContextProvider: React.FC<Props> = ({ children }) => {
 
     const auth = getAuth(app);
 
+    const storage = getStorage(app);
+
+    const firestore = getFirestore(app);
+
+    const functions = getFunctions(app, firebaseConfig.functionRegion);
+
     return (
         <FirebaseContext.Provider value={{
-            app, auth
+            app, auth, storage, firestore, functions
         }}>
             {children}
         </FirebaseContext.Provider>
@@ -83,5 +98,88 @@ export const useAuth = () => {
         error,
         signInWithGoogle,
         signOut
+    };
+};
+
+export const useFiles = () => {
+    const { user } = useAuth();
+    const { storage, firestore } = useFirebase();
+
+    if (!user) throw new Error("User is not signed in");
+
+    const filesCollection = collection(firestore, 'users', user.uid, "uploads");
+
+    const docRefForId = (id: string) => doc(firestore, "users", user.uid, "uploads", id);
+    const fileRefForId = (id: string) => ref(storage, `userUploads/${user.uid}/${id}`);
+
+    const [value] = useCollection(
+        filesCollection,
+        {
+            snapshotListenOptions: { includeMetadataChanges: true },
+        }
+    );
+
+    const filesWithUrls = useQueries({
+        queries: value?.docs.filter(file => !!file).map(file => ({
+            queryKey: ["fileUrl", file.id, file.data().uploaded],
+            queryFn: async () => getDownloadURL(fileRefForId(file.id))
+        })) ?? []
+    });
+
+    const fileDocs = useMemo(() => {
+        return value?.docs?.map((file, i) => {
+            const data = file.data();
+            const withUrl = filesWithUrls[i]?.data;
+            return {
+                id: file.id,
+                fileName: data.fileName,
+                uploaded: data.uploaded,
+                type: data.type,
+                size: (data.sizeX && data.sizeY) ? [data.sizeX as number, data.sizeY as number] as const : null,
+                url: data.uploaded ? withUrl : null,
+            };
+        }) ?? []
+    }, [value?.docs, filesWithUrls])
+
+    const uploadFile = async (file: File) => {
+        const docRef = await addDoc(filesCollection, {
+            uploaded: false,
+            type: file.type,
+            fileName: file.name,
+        });
+
+        const metadata = await uploadBytes(fileRefForId(docRef.id), file);
+        console.log("Metadata", metadata);
+
+        await updateDoc(docRef, { uploaded: true });
+    };
+
+    const deleteFile = async (id: string) => {
+        await Promise.all([
+            deleteObject(fileRefForId(id)),
+            deleteDoc(docRefForId(id)),
+        ]);
+    };
+
+    return {
+        uploadFile,
+        deleteFile,
+        files: fileDocs,
+    };
+};
+
+export const useFunctions = () => {
+    const { functions } = useFirebase();
+    const demoCall = httpsCallable(functions, 'on_demo_call');
+
+    const tryExampleCall = async (fileId: string) => {
+
+        const result = await demoCall({ file: fileId });
+
+        console.log("res", result);
+    };
+
+    return {
+        tryExampleCall
     };
 };

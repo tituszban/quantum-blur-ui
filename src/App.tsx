@@ -11,6 +11,10 @@ function App() {
     console.log("User", user);
   }, [user]);
 
+  if(loading) {
+    return null;
+  }
+
   return (
     <>
       {
