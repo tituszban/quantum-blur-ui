@@ -1,11 +1,10 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useMemo, useRef, useState } from 'react';
 import { initializeApp, FirebaseApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
 import { getAuth, signInWithPopup, GoogleAuthProvider, Auth, getAdditionalUserInfo, signOut as authSignOut } from "firebase/auth";
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { getStorage, ref, uploadBytes, FirebaseStorage, getDownloadURL, deleteObject, getBlob } from "firebase/storage";
-import { getFirestore, doc, Firestore, collection, addDoc, setDoc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
-import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
+import { getStorage, ref, uploadBytes, FirebaseStorage, getDownloadURL, deleteObject, getBlob, listAll, getMetadata } from "firebase/storage";
+import { getFirestore, doc, Firestore, collection, addDoc, updateDoc, deleteDoc, getDoc, setDoc, getDocs } from 'firebase/firestore';
+import { useCollection } from 'react-firebase-hooks/firestore';
 import { useQueries } from '@tanstack/react-query';
 import { Functions, getFunctions, httpsCallable } from "firebase/functions";
 
@@ -113,6 +112,7 @@ export interface UploadedFile {
 export const useFiles = () => {
     const { user } = useAuth();
     const { storage, firestore } = useFirebase();
+    const counterRef = useRef<number>();
 
     if (!user) throw new Error("User is not signed in");
 
@@ -150,17 +150,20 @@ export const useFiles = () => {
         }) ?? [];
     }, [value?.docs, filesWithUrls]);
 
-    const uploadFile = async (file: File) => {
+    const _uploadFile = async (name: string, type: string, file: File | Blob) => {
         const docRef = await addDoc(filesCollection, {
             uploaded: false,
-            type: file.type,
-            fileName: file.name,
+            type: type,
+            fileName: name,
         });
 
-        const metadata = await uploadBytes(fileRefForId(docRef.id), file);
-        console.log("Metadata", metadata);
+        await uploadBytes(fileRefForId(docRef.id), file);
 
         await updateDoc(docRef, { uploaded: true });
+    }
+
+    const uploadFile = async (file: File) => {
+        await _uploadFile(file.name, file.type, file);
     };
 
     const deleteFile = async (id: string) => {
@@ -193,13 +196,41 @@ export const useFiles = () => {
 
         // Clean up and remove the link
         link.parentNode?.removeChild(link);
-
     };
+
+    const setupAccountInitialFiles = async () => {
+        const userDoc = doc(firestore, "users", user.uid);
+        const docRef = await getDoc(userDoc);
+        const v = (counterRef.current ?? 0) + 1;
+        counterRef.current = v;
+        if(docRef.exists()){
+            return;
+        }
+
+        await setDoc(userDoc, {
+           displayName: user.displayName,
+           email: user.email,
+        });
+        if(counterRef.current !== v){
+            // Avoid double call race condition
+            return;
+        }
+
+        console.log("Setting up initial files");
+        const sharedFolder = ref(storage, "sharedFiles");
+        const sharedFiles = await listAll(sharedFolder);
+        await Promise.all(sharedFiles.items.map(async fileRef => {
+            const file = await getBlob(fileRef);
+            const metadata = await getMetadata(fileRef);
+            await _uploadFile(fileRef.name, metadata.contentType ?? "", file);
+        }))
+    }
 
     return {
         uploadFile,
         deleteFile,
         downloadFile,
+        setupAccountInitialFiles,
         files: fileDocs,
     };
 };

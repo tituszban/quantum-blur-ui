@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSun, faMoon, faArrowUpFromBracket, faFileArrowUp, faTrash, faDownload } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/button";
 import { useTheme } from "@/hooks/theme";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from 'react-dropzone';
 import { cn } from "@/lib/utils";
 import { P } from "@/components/typography";
@@ -18,14 +18,19 @@ import { Label } from "@/components/label";
 import { Slider } from "@/components/ui/slider";
 
 export default function DashboardPage() {
-    const { uploadFile, files, deleteFile, downloadFile } = useFiles();
+    const { uploadFile, files, deleteFile, downloadFile, setupAccountInitialFiles } = useFiles();
     const { quantumRotate } = useFunctions();
 
     const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
     const [requestPending, setRequestPending] = useState(false);
     const [createdFileId, setCreatedFileId] = useState<string | null>(null);
     const [useLog, setUseLog] = useState<boolean>(false);
-    const [sliderValue, setSliderValue] = useState<number>(50);
+    const [sliderValue, setSliderValue] = useState<number>(49);
+    const [currentPanel, setCurrentPanel] = useState<number>(0);
+
+    useEffect(() => {
+        setupAccountInitialFiles()
+    }, []);
 
     const handleDownloadFile = async (fileId: string) => {
         console.log("Download", fileId);
@@ -74,6 +79,7 @@ export default function DashboardPage() {
         quantumRotate(selectedFileId, useLog, transformScale(sliderValue)).then(result => {
             console.log(result);
             setCreatedFileId(result.data.new_doc);
+            setCurrentPanel(2);
         }).finally(() => setRequestPending(false));
     };
 
@@ -90,7 +96,7 @@ export default function DashboardPage() {
     return (
         <DashboardHeader>
             <div className="flex flex-row h-full w-full space-x-4 items-start justify-between">
-                <VerticalPanel title="1">
+                <VerticalPanel title="1" selected={currentPanel === 0} next={{ onClick: () => setCurrentPanel(1), disabled: selectedFileId === null }}>
                     <SelectFileDrawer
                         onUploadFile={uploadFile}
                         files={files}
@@ -98,10 +104,10 @@ export default function DashboardPage() {
                         onDeleteFile={handleDeleteFile}
                         selectedFile={files.find((f) => f.id === selectedFileId) ?? null}
                         onDownloadFile={(f) => handleDownloadFile(f.id)}
-                        disabled={disabled}
+                        disabled={requestPending}
                     />
                 </VerticalPanel>
-                <VerticalPanel title="2">
+                <VerticalPanel title="2" selected={currentPanel === 1}  prev={{ onClick: () => setCurrentPanel(0), disabled: disabled }}>
                     <ConfigurationPanel shouldAndimate={requestPending}>
                         <Tabs defaultValue="rotate" className="w-full h-full">
                             <TabsList className="grid w-full grid-cols-2">
@@ -168,7 +174,7 @@ export default function DashboardPage() {
                         </Tabs>
                     </ConfigurationPanel>
                 </VerticalPanel>
-                <VerticalPanel title="3">
+                <VerticalPanel title="3" selected={currentPanel === 2} prev={{ onClick: () => setCurrentPanel(0), disabled: disabled }}>
                     <div className="relative group">
                         {!createdFileId ? (
                             <div className="flex items-center align-middle justify-center">
@@ -246,9 +252,26 @@ const ConfigurationPanel: React.FC<{ children: React.ReactNode; shouldAndimate?:
     );
 };
 
-const VerticalPanel: React.FC<{ children: React.ReactNode; title?: string; }> = ({ children, title }) => {
+interface VerticalPanelProps {
+    children: React.ReactNode;
+    title?: string;
+    selected?: boolean;
+    next?: {
+        onClick: () => void;
+        disabled?: boolean;
+    };
+    prev?: {
+        onClick: () => void;
+        disabled?: boolean;
+    };
+}
+
+const VerticalPanel: React.FC<VerticalPanelProps> = ({ children, title, selected = true, next, prev }) => {
     return (
-        <div className="border w-1/3 h-full flex flex-col p-4 justify-between items-center rounded-md">
+        <div className={cn(
+            "border w-full lg:w-1/3 h-full flex-col p-4 justify-between items-center rounded-md",
+            !selected ? "hidden lg:flex" : "flex"
+        )}>
             <div className="">
                 {title && (
                     <div className="bg-muted w-16 h-16 flex items-center justify-center rounded-full">
@@ -259,7 +282,20 @@ const VerticalPanel: React.FC<{ children: React.ReactNode; title?: string; }> = 
             <div className="p-4 w-full">
                 {children}
             </div>
-            <div />
+            <div className="w-full">
+                <div className="flex justify-between lg:hidden">
+                    <div>
+                        {prev && (
+                            <Button variant="outline" disabled={prev.disabled} onClick={prev.onClick}>Back</Button>
+                        )}
+                    </div>
+                    <div>
+                        {next && (
+                            <Button variant="outline" disabled={next.disabled} onClick={next.onClick}>Next</Button>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
