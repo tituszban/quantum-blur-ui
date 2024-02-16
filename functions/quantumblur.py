@@ -321,10 +321,90 @@ def circuits2image(circuits: list[QuantumCircuit], log: bool = False):
     return heights2image(tuple(heights))
 
 
+def blur_height(
+    height: Height,
+    xi: float,
+    axis: Literal["x", "y"] = "x",
+    circuit: QuantumCircuit | None = None,
+    log: bool = False,
+) -> QuantumCircuit:
+    """
+    Applies a predetermined blur effect designed for a smooth blur.
+
+    Args:
+        height (dict): A dictionary in which keys are coordinates
+            for points on a grid, and the values are positive numbers of
+            any type.
+        xi (float): Fraction of pi rotation to apply on the qubit for
+            which the largest rotation is aplied
+        axis (string): `rx` rotations are used when this is `'x'`, and
+            `ry` rotations are used otherwise.
+        circuit (QuantumCircuit): Rotations are applied to the given circuit
+            if supplied. Otherwise one is made from `height`.
+        log (bool): If True, a logarithmic encoding is used.
+
+    Returns:
+        circuit (QuantumCircuit): Circuit on which the blur effect has been
+            added.
+    """
+
+    # get size and bit strings for the grid
+    Lx, Ly = get_size(height)
+    grid, n = make_grid(Lx, Ly)
+    # invert grid dict to have coords as keys
+    coord_grid = {grid[string]: string for string in grid}
+
+    rates: list[float] = [0] * n
+    for x in range(Lx):
+        for y in range(Ly):
+            # for this point, go through all neighbours
+            # and find all bits on which address differs
+            string = coord_grid[x, y]
+            axes = []
+            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                if (x + dx, y + dy) in coord_grid:
+                    nstring = coord_grid[x + dx, y + dy]
+                    for j, b in enumerate(nstring):
+                        if b != string[j]:
+                            axes.append(n - j - 1)
+            # add the height at this point to the rates for each of these
+            for j in axes:
+                if (x, y) in height:
+                    rates[j] += height[x, y]
+
+    # normalize the rates
+    max_rate = max(rates)
+    if max_rate == 0:
+        max_rate = 1
+    for j in range(n):
+        rates[j] /= max_rate
+
+    # make the circuit the rotation
+    qc_rot = QuantumCircuit(n)
+    for j in range(n):
+        theta = math.pi * rates[j] * math.pi * xi
+        if axis == "x":
+            qc_rot.rx(theta, j)
+        else:
+            qc_rot.ry(theta, j)
+
+    # add to initial circuit
+    if circuit:
+        composed_circuit = circuit.compose(qc_rot)
+    else:
+        composed_circuit = height2circuit(height, log=log).compose(qc_rot)
+    composed_circuit.name = "(" + str(Lx) + "," + str(Ly) + ")"
+
+    return composed_circuit
+
+
 class Circuits:
-    def __init__(self, circuits: list[QuantumCircuit], log: bool = False):
+    def __init__(
+        self, circuits: list[QuantumCircuit], heights: list[Height], log: bool = False
+    ):
         self._circuits = circuits
         self._log = log
+        self._heights = heights
 
     @staticmethod
     def image2heights(image: Image) -> list[Height]:
@@ -354,12 +434,14 @@ class Circuits:
         heights = cls.image2heights(image)
 
         circuits: list[QuantumCircuit] = []
+        valid_heights: list[Height] = []
         for height in heights:
             if all(h == 0 for h in height.values()):
                 continue
             circuits.append(height2circuit(height, log=log))
+            valid_heights.append(height)
 
-        return cls(circuits, log=log)
+        return cls(circuits, valid_heights, log=log)
 
     def apply(self, action: Callable[[QuantumCircuit], None]):
         for circuit in self._circuits:
@@ -367,3 +449,9 @@ class Circuits:
 
     def to_image(self) -> Image:
         return circuits2image(self._circuits, self._log)
+
+    def blur(self, xi: float, axis: Literal["x", "y"] = "x"):
+        self._circuits = [
+            blur_height(height, xi, axis=axis, circuit=self._circuits[j], log=self._log)
+            for j, height in enumerate(self._heights)
+        ]

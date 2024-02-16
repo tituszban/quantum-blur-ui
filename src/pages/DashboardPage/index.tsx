@@ -19,7 +19,7 @@ import { Slider } from "@/components/slider";
 
 export default function DashboardPage() {
     const { uploadFile, files, deleteFile, downloadFile, setupAccountInitialFiles } = useFiles();
-    const { quantumRotate } = useFunctions();
+    const { quantumRotate, quantumBlur } = useFunctions();
 
     const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
     const [requestPending, setRequestPending] = useState(false);
@@ -27,9 +27,10 @@ export default function DashboardPage() {
     const [useLog, setUseLog] = useState<boolean>(false);
     const [sliderValue, setSliderValue] = useState<number>(49);
     const [currentPanel, setCurrentPanel] = useState<number>(0);
+    const [selectedTab, setSelectedTab] = useState<"blur" | "rotate">("rotate");
 
     useEffect(() => {
-        setupAccountInitialFiles()
+        setupAccountInitialFiles();
     }, []);
 
     const handleDownloadFile = async (fileId: string) => {
@@ -45,30 +46,41 @@ export default function DashboardPage() {
     };
 
     const transformScale = (v: number) => {
-        if (!useLog) {
-            if (v < 50) {
-                return (v + 1) * 2 / 1000;
-            }
+        if (selectedTab == "rotate") {
+            if (!useLog) {
+                if (v < 50) {
+                    return (v + 1) * 2 / 1000;
+                }
 
-            const r = Math.round(10 + (v - 49) * 2) / 100;
-            if (r > 1) {
-                return 1;
+                const r = Math.round(10 + (v - 49) * 2) / 100;
+                if (r > 1) {
+                    return 1;
+                }
+                return r;
+            } else {
+                if (v < 50) {
+                    return (v + 1) * 2 / 10000;
+                }
+
+                if (v < 80) {
+                    return Math.round(10 + (v - 49) * 3) / 1000;
+                }
+
+                const r = Math.round(10 + (v - 79) * 5) / 100;
+                if (r > 1) {
+                    return 1;
+                }
+                return r;
             }
-            return r;
         } else {
-            if (v < 50) {
-                return (v + 1) * 2 / 10000;
+            if (v < 25) {
+                return (v + 1) * 4 / 1000;
+            }
+            if (v < 70) {
+                return Math.round(10 + (v - 24) * 2) / 100;
             }
 
-            if (v < 80) {
-                return Math.round(10 + (v - 49) * 3) / 1000;
-            }
-
-            const r = Math.round(10 + (v - 79) * 5) / 100;
-            if (r > 1) {
-                return 1;
-            }
-            return r;
+            return Math.round(10 + (v - 70) / 2 * 10) / 10;
         }
     };
 
@@ -76,12 +88,14 @@ export default function DashboardPage() {
         if (!selectedFileId) { return; }
         setRequestPending(true);
         setCreatedFileId(null);
-        quantumRotate(selectedFileId, useLog, transformScale(sliderValue)).then(result => {
-            console.log(result);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setCreatedFileId((result.data as any).new_doc);
-            setCurrentPanel(2);
-        }).finally(() => setRequestPending(false));
+        (selectedTab === "rotate"
+            ? quantumRotate(selectedFileId, useLog, transformScale(sliderValue))
+            : quantumBlur(selectedFileId, useLog, transformScale(sliderValue))).then(result => {
+                console.log(result);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                setCreatedFileId((result.data as any).new_doc);
+                setCurrentPanel(2);
+            }).finally(() => setRequestPending(false));
     };
 
     const handleFileSelected = (file: UploadedFile | null) => {
@@ -108,12 +122,12 @@ export default function DashboardPage() {
                         disabled={requestPending}
                     />
                 </VerticalPanel>
-                <VerticalPanel title="2" selected={currentPanel === 1}  prev={{ onClick: () => setCurrentPanel(0), disabled: disabled }}>
+                <VerticalPanel title="2" selected={currentPanel === 1} prev={{ onClick: () => setCurrentPanel(0), disabled: disabled }}>
                     <ConfigurationPanel shouldAndimate={requestPending}>
-                        <Tabs defaultValue="rotate" className="w-full h-full">
+                        <Tabs defaultValue="rotate" className="w-full h-full" onValueChange={(v: string) => setSelectedTab(v as "rotate" | "blur")} value={selectedTab}>
                             <TabsList className="grid w-full grid-cols-2">
                                 <TabsTrigger value="rotate">Rotate</TabsTrigger>
-                                <TabsTrigger value="blur" disabled={true}>Blur</TabsTrigger>
+                                <TabsTrigger value="blur">Blur</TabsTrigger>
                             </TabsList>
                             <TabsContent value="rotate" className="h-[calc(100%-45px)]">
                                 <Card className="h-full">
@@ -157,14 +171,25 @@ export default function DashboardPage() {
 
                                         </CardDescription>
                                     </CardHeader>
-                                    <CardContent className="space-y-2">
-                                        <div className="space-y-1">
-                                            {/* <Label htmlFor="current">Current password</Label> */}
-                                            {/* <Input id="current" type="password" /> */}
+                                    <CardContent className="space-y-4">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between space-x-2">
+                                                <Label htmlFor="log-scale" className="flex flex-col space-y-1">
+                                                    <span>Log scale</span>
+                                                </Label>
+                                                <Switch id="log-scale" checked={useLog} onCheckedChange={setUseLog} disabled={disabled} />
+                                            </div>
                                         </div>
-                                        <div className="space-y-1">
-                                            {/* <Label htmlFor="new">New password</Label> */}
-                                            {/* <Input id="new" type="password" /> */}
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between space-x-2">
+                                                <Label htmlFor="scale" className="flex flex-col space-y-1">
+                                                    <span>Xi</span>
+                                                </Label>
+                                                <Slider id="scale" max={100} step={1} value={[sliderValue]} onValueChange={e => setSliderValue(e[0])} disabled={disabled} />
+                                                <Label htmlFor="scale" className="flex flex-col space-y-1 w-16 text-right">
+                                                    {transformScale(sliderValue)}
+                                                </Label>
+                                            </div>
                                         </div>
                                     </CardContent>
                                     <CardFooter>

@@ -160,7 +160,7 @@ export const useFiles = () => {
         await uploadBytes(fileRefForId(docRef.id), file);
 
         await updateDoc(docRef, { uploaded: true });
-    }
+    };
 
     const uploadFile = async (file: File) => {
         await _uploadFile(file.name, file.type, file);
@@ -203,15 +203,15 @@ export const useFiles = () => {
         const docRef = await getDoc(userDoc);
         const v = (counterRef.current ?? 0) + 1;
         counterRef.current = v;
-        if(docRef.exists()){
+        if (docRef.exists()) {
             return;
         }
 
         await setDoc(userDoc, {
-           displayName: user.displayName,
-           email: user.email,
+            displayName: user.displayName,
+            email: user.email,
         });
-        if(counterRef.current !== v){
+        if (counterRef.current !== v) {
             // Avoid double call race condition
             return;
         }
@@ -223,8 +223,8 @@ export const useFiles = () => {
             const file = await getBlob(fileRef);
             const metadata = await getMetadata(fileRef);
             await _uploadFile(fileRef.name, metadata.contentType ?? "", file);
-        }))
-    }
+        }));
+    };
 
     return {
         uploadFile,
@@ -237,23 +237,19 @@ export const useFiles = () => {
 
 export const useFunctions = () => {
     const { functions } = useFirebase();
-    const demoCall = httpsCallable(functions, 'on_demo_call');
-    // const quantumBlurCall = httpsCallable(functions, 'on_quantum_blur');
+    const quantumBlurCall = httpsCallable(functions, 'on_quantum_blur');
     const quantumRotateCall = httpsCallable(functions, 'on_quantum_rotate');
-
-    const tryExampleCall = async (fileId: string) => {
-
-        const result = await demoCall({ file: fileId });
-
-        console.log("res", result);
-    };
 
     const quantumRotate = async (fileId: string, log: boolean = false, fraction: number = 0.25) => {
         return await quantumRotateCall({ fileId, log, fraction });
     };
 
+    const quantumBlur = async (fileId: string, log: boolean = false, xi: number = 0.5) => {
+        return await quantumBlurCall({ fileId, log, xi });
+    };
+
     return {
-        tryExampleCall,
-        quantumRotate
+        quantumRotate,
+        quantumBlur
     };
 };

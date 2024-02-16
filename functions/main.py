@@ -1,4 +1,4 @@
-from firebase_functions import https_fn, firestore_fn, storage_fn, options
+from firebase_functions import https_fn, storage_fn, options
 from firebase_admin import initialize_app, storage, firestore
 import pathlib
 from PIL import Image
@@ -18,7 +18,60 @@ def on_demo_call(req: https_fn.Request) -> https_fn.Response:
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1)
 def on_quantum_blur(req: https_fn.Request) -> https_fn.Response:
-    return {}
+    file_id = req.data["fileId"]
+
+    log = req.data.get("log", False)
+    xi = req.data.get("xi", 0.5)
+
+    bucket = storage.bucket(BUCKET_NAME)
+
+    def path_from_id(_file_id: str) -> str:
+        return str(pathlib.Path(f"userFiles/{req.auth.uid}/{_file_id}"))
+
+    image_blob = bucket.blob(path_from_id(file_id))
+    image_bytes = image_blob.download_as_bytes()
+    image = Image.open(io.BytesIO(image_bytes))
+
+    firestore_client = firestore.client()
+
+    doc_ref = firestore_client.document(f"users/{req.auth.uid}/uploads/{file_id}")
+    file_name = doc_ref.get().to_dict()["fileName"]
+    file_name_root = file_name.split(".")[0]
+
+    max_size = max(image.size)
+    if max_size > 256:
+        image.thumbnail((256, 256))
+
+    c = Circuits.from_image(image, log=log)
+    c.blur(xi=xi)
+    new_image = c.to_image()
+
+    _, new_doc_ref = firestore_client.collection(f"users/{req.auth.uid}/uploads").add(
+        {
+            "uploaded": False,
+            "type": "image/png",
+            "fileName": f"{file_name_root}_blur.png",
+            "source": doc_ref,
+            "modifications": {
+                "rotation": {
+                    "log": log,
+                    "xi": xi,
+                },
+            }
+        }
+    )
+
+    new_image_io = io.BytesIO()
+    new_image.save(new_image_io, format="png")
+
+    new_blob = bucket.blob(path_from_id(new_doc_ref.id))
+    new_blob.upload_from_string(new_image_io.getvalue(), content_type="image/png")
+
+    new_doc_ref.update({"uploaded": True})
+
+    return {
+        "new_doc": new_doc_ref.id,
+    }
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1)
 def on_quantum_rotate(req: https_fn.Request) -> https_fn.Response:
@@ -58,8 +111,14 @@ def on_quantum_rotate(req: https_fn.Request) -> https_fn.Response:
         {
             "uploaded": False,
             "type": "image/png",
-            "fileName": f"{file_name_root}_rot_{'log' if log else 'lin'}_{fraction}.png",
+            "fileName": f"{file_name_root}_rot.png",
             "source": doc_ref,
+            "modifications": {
+                "rotation": {
+                    "log": log,
+                    "fraction": fraction,
+                },
+            }
         }
     )
 
