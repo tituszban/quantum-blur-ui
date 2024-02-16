@@ -3,8 +3,8 @@ import { initializeApp, FirebaseApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth, signInWithPopup, GoogleAuthProvider, Auth, getAdditionalUserInfo, signOut as authSignOut } from "firebase/auth";
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { getStorage, ref, uploadBytes, FirebaseStorage, getDownloadURL, deleteObject } from "firebase/storage";
-import { getFirestore, doc, Firestore, collection, addDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, FirebaseStorage, getDownloadURL, deleteObject, getBlob } from "firebase/storage";
+import { getFirestore, doc, Firestore, collection, addDoc, setDoc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
 import { useQueries } from '@tanstack/react-query';
 import { Functions, getFunctions, httpsCallable } from "firebase/functions";
@@ -101,6 +101,15 @@ export const useAuth = () => {
     };
 };
 
+export interface UploadedFile {
+    id: string;
+    fileName: string;
+    uploaded: boolean;
+    type: string;
+    size: [number, number] | null;
+    url: string | null;
+}
+
 export const useFiles = () => {
     const { user } = useAuth();
     const { storage, firestore } = useFirebase();
@@ -110,7 +119,7 @@ export const useFiles = () => {
     const filesCollection = collection(firestore, 'users', user.uid, "uploads");
 
     const docRefForId = (id: string) => doc(firestore, "users", user.uid, "uploads", id);
-    const fileRefForId = (id: string) => ref(storage, `userUploads/${user.uid}/${id}`);
+    const fileRefForId = (id: string) => ref(storage, `userFiles/${user.uid}/${id}`);
 
     const [value] = useCollection(
         filesCollection,
@@ -126,7 +135,7 @@ export const useFiles = () => {
         })) ?? []
     });
 
-    const fileDocs = useMemo(() => {
+    const fileDocs: UploadedFile[] = useMemo(() => {
         return value?.docs?.map((file, i) => {
             const data = file.data();
             const withUrl = filesWithUrls[i]?.data;
@@ -138,8 +147,8 @@ export const useFiles = () => {
                 size: (data.sizeX && data.sizeY) ? [data.sizeX as number, data.sizeY as number] as const : null,
                 url: data.uploaded ? withUrl : null,
             };
-        }) ?? []
-    }, [value?.docs, filesWithUrls])
+        }) ?? [];
+    }, [value?.docs, filesWithUrls]);
 
     const uploadFile = async (file: File) => {
         const docRef = await addDoc(filesCollection, {
@@ -161,9 +170,36 @@ export const useFiles = () => {
         ]);
     };
 
+    const downloadFile = async (fileId: string) => {
+        const file = fileDocs.find(file => file.id === fileId);
+        if (!file) { return; }
+        const blob = await getBlob(fileRefForId(fileId));
+
+        const url = window.URL.createObjectURL(
+            new Blob([blob]),
+        );
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute(
+            'download',
+            file.fileName,
+        );
+
+        // Append to html link element page
+        document.body.appendChild(link);
+
+        // Start download
+        link.click();
+
+        // Clean up and remove the link
+        link.parentNode?.removeChild(link);
+
+    };
+
     return {
         uploadFile,
         deleteFile,
+        downloadFile,
         files: fileDocs,
     };
 };
@@ -171,6 +207,8 @@ export const useFiles = () => {
 export const useFunctions = () => {
     const { functions } = useFirebase();
     const demoCall = httpsCallable(functions, 'on_demo_call');
+    const quantumBlurCall = httpsCallable(functions, 'on_quantum_blur');
+    const quantumRotateCall = httpsCallable(functions, 'on_quantum_rotate');
 
     const tryExampleCall = async (fileId: string) => {
 
@@ -179,7 +217,12 @@ export const useFunctions = () => {
         console.log("res", result);
     };
 
+    const quantumRotate = async (fileId: string, log: boolean = false, fraction: number = 0.25) => {
+        return await quantumRotateCall({ fileId, log, fraction });
+    };
+
     return {
-        tryExampleCall
+        tryExampleCall,
+        quantumRotate
     };
 };

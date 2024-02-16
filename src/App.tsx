@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useAuth } from './hooks/firebase';
 import { Button } from '@/components/button';
 import AuthenticationPage from './pages/AuthenticationPage';
-import DashboardPage from './pages/Dashboard';
+import DashboardPage from './pages/DashboardPage';
 
 function App() {
   const { user, loading, signInWithGoogle, signOut } = useAuth();
