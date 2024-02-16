@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/tabs";
 import { Switch } from "@/components/switch";
 import { Label } from "@/components/label";
-import { Slider } from "@/components/ui/slider";
+import { Slider } from "@/components/slider";
 
 export default function DashboardPage() {
     const { uploadFile, files, deleteFile, downloadFile, setupAccountInitialFiles } = useFiles();
