@@ -53,7 +53,7 @@ def on_quantum_blur(req: https_fn.Request) -> https_fn.Response:
             "fileName": f"{file_name_root}_blur.png",
             "source": doc_ref,
             "modifications": {
-                "rotation": {
+                "blur": {
                     "log": log,
                     "xi": xi,
                 },
