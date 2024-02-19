@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo, useRef, useState } from 'react';
 import { initializeApp, FirebaseApp } from "firebase/app";
-import { getAuth, signInWithPopup, GoogleAuthProvider, Auth, getAdditionalUserInfo, signOut as authSignOut } from "firebase/auth";
+import { getAuth, signInWithPopup, GoogleAuthProvider, Auth, getAdditionalUserInfo, signOut as authSignOut, GithubAuthProvider } from "firebase/auth";
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { getStorage, ref, uploadBytes, FirebaseStorage, getDownloadURL, deleteObject, getBlob, listAll, getMetadata } from "firebase/storage";
 import { getFirestore, doc, Firestore, collection, addDoc, updateDoc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
@@ -68,13 +68,33 @@ export const useAuth = () => {
 
     const signInWithGoogle = () => {
         const provider = new GoogleAuthProvider();
-        console.log("Sign in");
+        console.log("Sign in with Google");
         setSignInLoading(true);
         signInWithPopup(auth, provider)
             .then((result) => {
                 console.log("AuthResult", result);
                 // This gives you a Google Access Token. You can use it to access the Google API.
                 const credential = GoogleAuthProvider.credentialFromResult(result);
+                if (credential === null) throw new Error("Credential is null");
+                console.log("AuthCredentials", credential);
+
+                console.log("AuthAdditionalUserInfo", getAdditionalUserInfo(result));
+            }).catch((error) => {
+                console.error(error);
+            }).finally(() => {
+                setSignInLoading(false);
+            });
+    };
+
+    const signInWithGitHub = () => {
+        const provider = new GithubAuthProvider();
+        console.log("Sign in with GitHub");
+        setSignInLoading(true);
+        signInWithPopup(auth, provider)
+            .then((result) => {
+                console.log("AuthResult", result);
+                // This gives you a Google Access Token. You can use it to access the Google API.
+                const credential = GithubAuthProvider.credentialFromResult(result);
                 if (credential === null) throw new Error("Credential is null");
                 console.log("AuthCredentials", credential);
 
@@ -96,6 +116,7 @@ export const useAuth = () => {
         signInLoading,
         error,
         signInWithGoogle,
+        signInWithGitHub,
         signOut
     };
 };

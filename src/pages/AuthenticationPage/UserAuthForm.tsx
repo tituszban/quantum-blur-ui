@@ -7,13 +7,17 @@ import { Icons } from "@/components/icons";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Label } from "@/components/label";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faGithub } from "@fortawesome/free-brands-svg-icons";
 
 interface UserAuthFormProps extends React.HTMLAttributes<HTMLDivElement> {
     isLoading: boolean;
     onSubmit: (event: React.SyntheticEvent) => void;
+    onGoogle: () => void;
+    onGitHub: () => void;
  }
 
-export function UserAuthForm({ className, onSubmit, isLoading = false, ...props }: UserAuthFormProps) {
+export function UserAuthForm({ className, onGoogle, onGitHub, isLoading = false, ...props }: UserAuthFormProps) {
 
     return (
         <>
@@ -60,13 +64,21 @@ export function UserAuthForm({ className, onSubmit, isLoading = false, ...props 
                         </span>
                     </div>
                 </div>
-                <Button variant="outline" type="button" disabled={isLoading} onClick={onSubmit}>
+                <Button variant="outline" type="button" disabled={isLoading} onClick={onGoogle}>
                     {isLoading ? (
                         <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                         <Icons.google className="mr-2 h-4 w-4" />
                     )}{" "}
                     Sign in with Google
+                </Button>
+                <Button variant="outline" type="button" disabled={isLoading} onClick={onGitHub}>
+                    {isLoading ? (
+                        <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                        <FontAwesomeIcon icon={faGithub} className="mr-2 h-4 w-4" />
+                    )}{" "}
+                    Sign in with GitHub
                 </Button>
             </div>
         </>
