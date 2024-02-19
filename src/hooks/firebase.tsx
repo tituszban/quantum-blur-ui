@@ -7,6 +7,7 @@ import { getFirestore, doc, Firestore, collection, addDoc, updateDoc, deleteDoc,
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { useQueries } from '@tanstack/react-query';
 import { Functions, getFunctions, httpsCallable } from "firebase/functions";
+import { useToast } from '@/components/toast/use-toast';
 
 const firebaseConfig = {
     apiKey: "AIzaSyATHYacPTaCwSGH7Jnme0bCFOh9SuKoHUs",
@@ -64,6 +65,7 @@ export const useAuth = () => {
     const { auth } = useFirebase();
     const [user, loading, error] = useAuthState(auth);
     const [signInLoading, setSignInLoading] = useState<boolean>(false);
+    const { toast } = useToast();
 
 
     const signInWithGoogle = () => {
@@ -80,6 +82,10 @@ export const useAuth = () => {
 
                 console.log("AuthAdditionalUserInfo", getAdditionalUserInfo(result));
             }).catch((error) => {
+                toast({
+                    title: "Error signing in",
+                    description: error.message,
+                });
                 console.error(error);
             }).finally(() => {
                 setSignInLoading(false);
@@ -100,6 +106,10 @@ export const useAuth = () => {
 
                 console.log("AuthAdditionalUserInfo", getAdditionalUserInfo(result));
             }).catch((error) => {
+                toast({
+                    title: "Error signing in",
+                    description: error.message,
+                });
                 console.error(error);
             }).finally(() => {
                 setSignInLoading(false);
@@ -134,6 +144,7 @@ export const useFiles = () => {
     const { user } = useAuth();
     const { storage, firestore } = useFirebase();
     const counterRef = useRef<number>();
+    const { toast } = useToast();
 
     if (!user) throw new Error("User is not signed in");
 
@@ -184,67 +195,99 @@ export const useFiles = () => {
     };
 
     const uploadFile = async (file: File) => {
-        await _uploadFile(file.name, file.type, file);
+        try {
+            await _uploadFile(file.name, file.type, file);
+        } catch (e) {
+            toast({
+                title: "Error uploading file",
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                description: (e as any)?.message,
+            });
+        }
     };
 
     const deleteFile = async (id: string) => {
-        await Promise.all([
-            deleteObject(fileRefForId(id)),
-            deleteDoc(docRefForId(id)),
-        ]);
+        try {
+            await Promise.all([
+                deleteObject(fileRefForId(id)),
+                deleteDoc(docRefForId(id)),
+            ]);
+        } catch (e) {
+            toast({
+                title: "Error deleting file",
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                description: (e as any)?.message,
+            });
+        }
     };
 
     const downloadFile = async (fileId: string) => {
-        const file = fileDocs.find(file => file.id === fileId);
-        if (!file) { return; }
-        const blob = await getBlob(fileRefForId(fileId));
+        try {
+            const file = fileDocs.find(file => file.id === fileId);
+            if (!file) { return; }
+            const blob = await getBlob(fileRefForId(fileId));
 
-        const url = window.URL.createObjectURL(
-            new Blob([blob]),
-        );
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute(
-            'download',
-            file.fileName,
-        );
+            const url = window.URL.createObjectURL(
+                new Blob([blob]),
+            );
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute(
+                'download',
+                file.fileName,
+            );
 
-        // Append to html link element page
-        document.body.appendChild(link);
+            // Append to html link element page
+            document.body.appendChild(link);
 
-        // Start download
-        link.click();
+            // Start download
+            link.click();
 
-        // Clean up and remove the link
-        link.parentNode?.removeChild(link);
+            // Clean up and remove the link
+            link.parentNode?.removeChild(link);
+        } catch (e) {
+            toast({
+                title: "Error downloading file",
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                description: (e as any)?.message,
+            });
+        }
     };
 
     const setupAccountInitialFiles = async () => {
-        const userDoc = doc(firestore, "users", user.uid);
-        const docRef = await getDoc(userDoc);
-        const v = (counterRef.current ?? 0) + 1;
-        counterRef.current = v;
-        if (docRef.exists()) {
-            return;
-        }
+        try {
+            const userDoc = doc(firestore, "users", user.uid);
+            const docRef = await getDoc(userDoc);
+            const v = (counterRef.current ?? 0) + 1;
+            counterRef.current = v;
+            if (docRef.exists()) {
+                return;
+            }
 
-        await setDoc(userDoc, {
-            displayName: user.displayName,
-            email: user.email,
-        });
-        if (counterRef.current !== v) {
-            // Avoid double call race condition
-            return;
-        }
+            await setDoc(userDoc, {
+                displayName: user.displayName,
+                email: user.email,
+            });
+            if (counterRef.current !== v) {
+                // Avoid double call race condition
+                return;
+            }
 
-        console.log("Setting up initial files");
-        const sharedFolder = ref(storage, "sharedFiles");
-        const sharedFiles = await listAll(sharedFolder);
-        await Promise.all(sharedFiles.items.map(async fileRef => {
-            const file = await getBlob(fileRef);
-            const metadata = await getMetadata(fileRef);
-            await _uploadFile(fileRef.name, metadata.contentType ?? "", file);
-        }));
+            console.log("Setting up initial files");
+            const sharedFolder = ref(storage, "sharedFiles");
+            const sharedFiles = await listAll(sharedFolder);
+            await Promise.all(sharedFiles.items.map(async fileRef => {
+                const file = await getBlob(fileRef);
+                const metadata = await getMetadata(fileRef);
+                await _uploadFile(fileRef.name, metadata.contentType ?? "", file);
+            }));
+        } catch (e) {
+            toast({
+                title: "Account initialisation failed",
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                description: (e as any)?.message,
+            });
+        }
     };
 
     return {
@@ -260,13 +303,30 @@ export const useFunctions = () => {
     const { functions } = useFirebase();
     const quantumBlurCall = httpsCallable(functions, 'on_quantum_blur');
     const quantumRotateCall = httpsCallable(functions, 'on_quantum_rotate');
+    const { toast } = useToast();
 
     const quantumRotate = async (fileId: string, log: boolean = false, fraction: number = 0.25) => {
-        return await quantumRotateCall({ fileId, log, fraction });
+        try {
+            return await quantumRotateCall({ fileId, log, fraction });
+        } catch (e) {
+            toast({
+                title: "Failed to quantum rotate",
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                description: (e as any)?.message,
+            });
+        }
     };
 
     const quantumBlur = async (fileId: string, log: boolean = false, xi: number = 0.5) => {
-        return await quantumBlurCall({ fileId, log, xi });
+        try {
+            return await quantumBlurCall({ fileId, log, xi });
+        } catch (e) {
+            toast({
+                title: "Failed to quantum blur",
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                description: (e as any)?.message,
+            });
+        }
     };
 
     return {

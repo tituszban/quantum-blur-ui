@@ -8,6 +8,7 @@ import {
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query';
+import { Toaster } from "@/components/toast/toaster.tsx";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,6 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <FirebaseContextProvider>
         <ThemeProvider>
           <App />
+          <Toaster />
         </ThemeProvider>
       </FirebaseContextProvider>
     </QueryClientProvider>
