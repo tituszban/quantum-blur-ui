@@ -15,7 +15,7 @@ interface UserAuthFormProps extends React.HTMLAttributes<HTMLDivElement> {
     onSubmit: (event: React.SyntheticEvent) => void;
     onGoogle: () => void;
     onGitHub: () => void;
- }
+}
 
 export function UserAuthForm({ className, onGoogle, onGitHub, isLoading = false, ...props }: UserAuthFormProps) {
 
@@ -30,7 +30,7 @@ export function UserAuthForm({ className, onGoogle, onGitHub, isLoading = false,
                 </p>
             </div>
             <div className={cn("grid gap-6", className)} {...props}>
-                <form onSubmit={() => {}}>
+                <form onSubmit={() => { }}>
                     <div className="grid gap-2">
                         <div className="grid gap-1">
                             <Label className="sr-only" htmlFor="email">
