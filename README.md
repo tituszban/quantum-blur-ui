@@ -6,4 +6,4 @@ It had to be heavily modified to (1) Work and (2) have proper type hint support.
 
 It also here for me to try out [shadcn/ui](https://ui.shadcn.com/) and fully Firebase native apps.
 
-Deployed at [quantumblur.degewhale.club](https://quantumblur.degenwhale.club/) using Firebase Hosting
+Deployed at [quantumblur.degewhale.club](https://quantumblur.degenwhale.club/) using Firebase Hosting.
