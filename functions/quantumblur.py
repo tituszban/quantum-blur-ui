@@ -269,6 +269,7 @@ def circuit2height(qc: QuantumCircuit, log: bool = False):
         size = (L, L)
     return probs2height(probs, size=size, log=log)
 
+
 def heights2image(heights: list[Height]):
     """
     Constructs an image from a set of three height dictionaries, one for each
@@ -302,6 +303,7 @@ def heights2image(heights: list[Height]):
                 image.putpixel((x, y), tuple(rgb))
 
     return image
+
 
 def circuits2image(circuits: list[QuantumCircuit], log: bool = False):
     """
